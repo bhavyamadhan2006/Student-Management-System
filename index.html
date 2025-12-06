@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management System</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        h2 {
+            margin-bottom: 10px;
+        }
+        input, button {
+            margin: 5px 0;
+            padding: 5px;
+        }
+        button {
+            cursor: pointer;
+        }
+        table {
+            margin-top: 20px;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            cursor: pointer;
+        }
+        .editing-row {
+            background-color: #ffff99;
+        }
+        #clearAllBtn {
+            background-color: red;
+            color: white;
+        }
+        #noDataRow td {
+            text-align: center;
+            color: gray;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Add Student</h2>
+    <input type="text" placeholder="Name" id="name">
+    <input type="number" placeholder="Age" id="age">
+    <input type="text" placeholder="Phone" id="phone">
+    <input type="email" placeholder="Email" id="email">
+    <button type="button" id="saveBtn">Save</button>
+    <button type="button" id="clearAllBtn">Clear All Students</button>
+
+    <h2>Student List</h2>
+    <input type="text" id="searchInput" placeholder="Search by Name, Phone, or Email">
+
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Age</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+
+        <tbody id="tableBody">
+            <tr id="noDataRow" style="display:none;">
+                <td colspan="5">No students found</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        const nameInput = document.getElementById("name");
+        const ageInput = document.getElementById("age");
+        const phoneInput = document.getElementById("phone");
+        const emailInput = document.getElementById("email");
+        const tableBody = document.getElementById("tableBody");
+        const searchInput = document.getElementById("searchInput");
+        const clearAllBtn = document.getElementById("clearAllBtn");
+
+        let students = JSON.parse(localStorage.getItem("students")) || [];
+        let editingRow = null;
+
+        students.forEach(student => addRow(student));
+
+        function checkEmptyTable() {
+            const rows = tableBody.querySelectorAll("tr:not(#noDataRow)");
+            const noDataRow = document.getElementById("noDataRow");
+
+            if (rows.length === 0) {
+                noDataRow.style.display = "";
+            } else {
+                noDataRow.style.display = "none";
+            }
+        }
+
+        function addRow(student, index = students.length - 1) {
+            const row = document.createElement("tr");
+            row.dataset.index = index;
+            row.innerHTML = `
+                <td>${student.name}</td>
+                <td>${student.age}</td>
+                <td>${student.phone}</td>
+                <td>${student.email}</td>
+                <td>
+                    <button class="editBtn">Edit</button>
+                    <button class="updateBtn" style="display:none;">Update</button>
+                    <button class="deleteBtn">Delete</button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+            checkEmptyTable();
+
+            const editBtn = row.querySelector(".editBtn");
+            const updateBtn = row.querySelector(".updateBtn");
+            const deleteBtn = row.querySelector(".deleteBtn");
+
+            editBtn.addEventListener("click", function () {
+                if (editingRow) editingRow.classList.remove("editing-row");
+
+                nameInput.value = row.cells[0].textContent;
+                ageInput.value = row.cells[1].textContent;
+                phoneInput.value = row.cells[2].textContent;
+                emailInput.value = row.cells[3].textContent;
+
+                row.classList.add("editing-row");
+                editBtn.style.display = "none";
+                updateBtn.style.display = "inline-block";
+                editingRow = row;
+            });
+
+            updateBtn.addEventListener("click", function () {
+                const name = nameInput.value.trim();
+                const age = ageInput.value.trim();
+                const phone = phoneInput.value.trim();
+                const email = emailInput.value.trim();
+
+                const nameRegex = /^[A-Za-z\s]+$/;
+                const phoneRegex = /^\d{10}$/;
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+                if (!name || !age || !phone || !email) { alert("Fill all fields"); return; }
+                if (!nameRegex.test(name)) { alert("Name must contain only letters and spaces"); return; }
+                if (isNaN(age) || age <= 0 || age > 120) { alert("Age must be a number between 1 and 120"); return; }
+                if (!phoneRegex.test(phone)) { alert("Phone number must be 10 digits"); return; }
+                if (!emailRegex.test(email)) { alert("Enter a valid email address"); return; }
+
+                const studentData = { name, age, phone, email };
+                row.cells[0].textContent = name;
+                row.cells[1].textContent = age;
+                row.cells[2].textContent = phone;
+                row.cells[3].textContent = email;
+
+                const idx = row.dataset.index;
+                students[idx] = studentData;
+                localStorage.setItem("students", JSON.stringify(students));
+
+                editBtn.style.display = "inline-block";
+                updateBtn.style.display = "none";
+                row.classList.remove("editing-row");
+                editingRow = null;
+
+                nameInput.value = "";
+                ageInput.value = "";
+                phoneInput.value = "";
+                emailInput.value = "";
+            });
+
+            deleteBtn.addEventListener("click", function () {
+                const idx = row.dataset.index;
+                students.splice(idx, 1);
+                localStorage.setItem("students", JSON.stringify(students));
+                row.remove();
+                refreshTableIndexes();
+                if (editingRow === row) editingRow = null;
+                checkEmptyTable();
+            });
+        }
+
+        function refreshTableIndexes() {
+            const rows = tableBody.querySelectorAll("tr:not(#noDataRow)");
+            rows.forEach((row, idx) => row.dataset.index = idx);
+        }
+
+        document.getElementById("saveBtn").addEventListener("click", function () {
+            const name = nameInput.value.trim();
+            const age = ageInput.value.trim();
+            const phone = phoneInput.value.trim();
+            const email = emailInput.value.trim();
+
+            const nameRegex = /^[A-Za-z\s]+$/;
+            const phoneRegex = /^\d{10}$/;
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            if (!name || !age || !phone || !email) { alert("Fill all fields"); return; }
+            if (!nameRegex.test(name)) { alert("Name must contain only letters and spaces"); return; }
+            if (isNaN(age) || age <= 0 || age > 120) { alert("Age must be a number between 1 and 120"); return; }
+            if (!phoneRegex.test(phone)) { alert("Phone number must be 10 digits"); return; }
+            if (!emailRegex.test(email)) { alert("Enter a valid email address"); return; }
+
+            const studentData = { name, age, phone, email };
+            students.push(studentData);
+            addRow(studentData, students.length - 1);
+            localStorage.setItem("students", JSON.stringify(students));
+
+            nameInput.value = "";
+            ageInput.value = "";
+            phoneInput.value = "";
+            emailInput.value = "";
+        });
+
+        searchInput.addEventListener("input", function () {
+            const query = searchInput.value.toLowerCase();
+            const rows = tableBody.querySelectorAll("tr:not(#noDataRow)");
+            let found = false;
+
+            rows.forEach(row => {
+                const name = row.cells[0].textContent.toLowerCase();
+                const phone = row.cells[2].textContent.toLowerCase();
+                const email = row.cells[3].textContent.toLowerCase();
+
+                if (name.includes(query) || phone.includes(query) || email.includes(query)) {
+                    row.style.display = "";
+                    found = true;
+                } else {
+                    row.style.display = "none";
+                }
+            });
+
+            const noDataRow = document.getElementById("noDataRow");
+            noDataRow.style.display = found ? "none" : "";
+        });
+
+        const tableHeaders = document.querySelectorAll("th");
+        let sortDirection = {};
+
+        tableHeaders.forEach((header, index) => {
+            if (index === 4) return;
+
+            sortDirection[index] = "asc";
+
+            header.addEventListener("click", () => {
+                const rowsArray = Array.from(tableBody.querySelectorAll("tr:not(#noDataRow)"));
+
+                rowsArray.sort((a, b) => {
+                    let valA = a.cells[index].textContent.toLowerCase();
+                    let valB = b.cells[index].textContent.toLowerCase();
+
+                    if (index === 1 || index === 2) {
+                        valA = Number(valA);
+                        valB = Number(valB);
+                    }
+
+                    if (valA < valB) return sortDirection[index] === "asc" ? -1 : 1;
+                    if (valA > valB) return sortDirection[index] === "asc" ? 1 : -1;
+                    return 0;
+                });
+
+                rowsArray.forEach(row => tableBody.appendChild(row));
+                sortDirection[index] = sortDirection[index] === "asc" ? "desc" : "asc";
+            });
+        });
+
+        clearAllBtn.addEventListener("click", function () {
+            if (confirm("Are you sure you want to delete all students?")) {
+                students = [];
+                localStorage.removeItem("students");
+                tableBody.querySelectorAll("tr:not(#noDataRow)").forEach(row => row.remove());
+                editingRow = null;
+                checkEmptyTable();
+            }
+        });
+
+        checkEmptyTable();
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
